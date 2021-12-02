@@ -64,6 +64,11 @@ class Block {
 	 */
 	public function render_callback( $attributes, $content, $block ) {
 		$post_types = get_post_types(  [ 'public' => true ] );
+		/* We need to check if $post_types is not empty before we proceed to the next */
+		if ( empty( $post_types ) ) {
+        esc_html_e('No Posts Found.', 'xwp_site_counts');
+        return false;
+    	}
 		$class_name = $attributes['className'];
 		ob_start();
 
@@ -82,17 +87,40 @@ class Block {
 						]
 					)
                 );
-
 				?>
-				<li><?php echo 'There are ' . $post_count . ' ' .
+				<li><?php esc_html_e('There are.', 'xwp_site_counts') . $post_count . ' ' .
 					  $post_type_object->labels->name . '.'; ?></li>
 			<?php endforeach;	?>
-			</ul><p><?php echo 'The current post ID is ' . $_GET['post_id'] . '.'; ?></p>
+
+			</ul>
+
+			<p><?php
+
+			/* we need to check if we have the $_GET['post_id'] otherwise we can get the current post ID by using get_the_ID() function; */
+
+			if (isset($_GET['post_id']) && $_GET['post_id'] != '') {
+
+				$post_id =$_GET['post_id'];
+
+			} else {
+			$post_id = get_the_ID();
+			}
+
+			esc_html_e('The current post ID is: ', 'xwp_site_counts'). $post_id; 
+
+			?></p>
 
 			<?php
-			$query = new WP_Query(  array(
+
+			/* by Default we don't have Tag and Categories inside pages section but it is something we can add so it is better to have a full fonction that consider pages'tag and categories as well for future use; */
+
+			$args = array(
 				'post_type' => ['post', 'page'],
-				'post_status' => 'any',
+				'post_status' => 'any', /* any will consider draft posts as well, so we need to clarify with the client on needs otherwise we have to change to publish so that only published post are considered*/ 
+				'post__not_in' => array(get_the_ID()),
+				'posts_per_page' => 5, 
+				'order' => 'ASC',
+				'tag'  => 'foo',
 				'date_query' => array(
 					array(
 						'hour'      => 9,
@@ -103,25 +131,53 @@ class Block {
 						'compare'=> '<=',
 					),
 				),
-                'tag'  => 'foo',
-                'category_name'  => 'baz',
-				  'post__not_in' => [ get_the_ID() ],
+           
+				  
 			));
 
-			if ( $query->found_posts ) :
+			/* we separate the tax from the main $agrs in case we would like to add more categories to the clause; */
+ 			$args['tax_query'][] = array('relation' => 'AND');
+ 			$args['tax_query'][] = array(
+		      array(
+		        'taxonomy' => 'category',
+		        'field' => 'slug',
+		        'terms' => 'baz'
+		      )
+		    );
+
+			$query = new WP_Query($args);
+			$count_total = $query->found_posts; 
+
+			if ( $count_total != 0 ) :
 				?>
-				 <h2>5 posts with the tag of foo and the category of baz</h2>
+				 <h2> <?php echo $count_total." ".esc_html_e('posts with the tag of foo and the category of baz.', 'xwp_site_counts') ?></h2>
                 <ul>
                 <?php
 
-                 foreach ( array_slice( $query->posts, 0, 5 ) as $post ) :
-                    ?><li><?php echo $post->post_title ?></li><?php
-				endforeach;
+                /* since we already limit the result to 5 so no need for the array_slice; */
+                if( $query->have_posts() ) {  
+                		while( $query->have_posts() ) { 
+                				$query->the_post(); global $post;?>
+                	<li><?php echo get_the_title(); ?></li>
+
+                	<?php
+						}
+					}
+					else: 
+					?>
+					 <h2> <?php esc_html_e('No posts found with the tag of foo and the category of baz.', 'xwp_site_counts') ?></h2>
+
+			<?		
+
 			endif;
 		 	?>
 			</ul>
+			  <?php wp_reset_postdata();
+			    wp_reset_query();
+			     ?>
 		</div>
 		<?php
+
 
 		return ob_get_clean();
 	}
