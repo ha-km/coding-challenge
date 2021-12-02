@@ -67,7 +67,7 @@ class Block {
 		/* We need to check if $post_types is not empty before we proceed to the next */
 		if ( empty( $post_types ) ) {
         esc_html_e('No Posts Found.', 'xwp_site_counts');
-        return false;
+        wp_die();
     	}
 		$class_name = $attributes['className'];
 		ob_start();
